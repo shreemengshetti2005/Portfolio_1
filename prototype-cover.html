@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Instrument — Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* LAYOUT: persistent device chrome (rails, edge marker) framing a viewport.
+   Six section modules slide vertically inside it with detented scroll.
+   Navigation: scroll (primary) · hairline position marker (periphery) · INDEX overlay (door). */
+:root{
+  --chassis:#141615;          /* graphite plate */
+  --chassis-deep:#0a0b0b;     /* bezel behind plate */
+  --silk:#eae8e1;             /* bone silkscreen ink */
+  --silk-dim:#848782;         /* secondary silkscreen */
+  --groove-d:rgba(0,0,0,.55); /* engraved groove shadow */
+  --groove-l:rgba(255,255,255,.07);
+  --led:#ffb000;              /* LED emitter */
+  --led-glow:rgba(255,176,0,.5);
+  --led-ink:#ffb000;          /* amber as text on this bg */
+  --stroke:rgba(234,232,225,.22);  /* ghost-title outline */
+  --font-d:'Archivo',Futura,'Helvetica Neue',Arial,sans-serif;
+  --font-m:'IBM Plex Mono','Cascadia Code',Consolas,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --chassis:#e8e6df; --chassis-deep:#c9c7bf;
+  --silk:#191b19; --silk-dim:#6e716b;
+  --groove-d:rgba(0,0,0,.16); --groove-l:rgba(255,255,255,.75);
+  --led:#ffb000; --led-glow:rgba(230,140,0,.45); --led-ink:#9a5f00;
+  --stroke:rgba(25,27,25,.25);
+  color-scheme:light;
+}
+
+html,body{height:100%}
+body{
+  margin:0; background:var(--chassis-deep); color:var(--silk);
+  font-family:var(--font-d); overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.stage{height:100%; display:flex; padding:clamp(8px,1.6vw,20px); box-sizing:border-box; perspective:1200px}
+
+/* ---------- faceplate (persistent chrome) ---------- */
+.faceplate{
+  position:relative; flex:1; min-width:0; display:flex; flex-direction:column;
+  background:var(--chassis); border-radius:14px;
+  padding:clamp(16px,2.6vw,36px); box-sizing:border-box;
+  box-shadow:
+    inset 0 1px 0 var(--groove-l),
+    inset 0 -1px 0 var(--groove-d),
+    0 10px 40px rgba(0,0,0,.35);
+  overflow:hidden;
+  transform-style:preserve-3d; will-change:transform;
+}
+.faceplate::after{
+  content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit; z-index:9;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity:.045; mix-blend-mode:overlay;
+}
+.sheen{
+  position:absolute; inset:0; pointer-events:none; border-radius:inherit; z-index:5;
+  background:radial-gradient(640px circle at var(--mx,50%) var(--my,40%), rgba(255,255,255,.065), transparent 62%);
+}
+.tick{position:absolute; font-family:var(--font-m); font-size:10px; color:var(--silk-dim); opacity:.55; user-select:none; z-index:6}
+.tick.tl{top:8px;left:12px}.tick.tr{top:8px;right:12px}.tick.bl{bottom:8px;left:12px}.tick.br{bottom:8px;right:12px}
+
+.scanline{
+  position:absolute; left:0; right:0; top:0; height:2px; pointer-events:none; z-index:6;
+  background:linear-gradient(90deg,transparent,var(--led),transparent);
+  box-shadow:0 0 14px 2px var(--led-glow);
+  opacity:0; animation:sweep .95s ease-in-out .15s both;
+}
+@keyframes sweep{
+  0%{top:0;opacity:0} 12%{opacity:.85} 88%{opacity:.85} 100%{top:calc(100% - 2px);opacity:0}
+}
+
+/* ---------- micro type ---------- */
+.micro{
+  font-family:var(--font-m); font-size:10.5px; letter-spacing:.14em;
+  color:var(--silk-dim); text-transform:uppercase; white-space:nowrap;
+}
+.micro.strong{color:var(--silk)}
+.micro.big{font-size:12px}
+.amber{color:var(--led-ink)}
+
+/* ---------- rails ---------- */
+.rail{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; position:relative; z-index:6}
+.rail.top{animation:fadeIn .6s ease .75s both}
+.rail.bottom{animation:fadeIn .6s ease 1.2s both}
+.cluster{display:flex; align-items:center; gap:12px; min-width:0}
+.divider-v{width:1px; height:14px; background:var(--groove-l); box-shadow:-1px 0 0 var(--groove-d)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.led{width:8px; height:8px; border-radius:50%; background:var(--led); box-shadow:0 0 10px 2px var(--led-glow); flex:none}
+.led.pwr{animation:bootBlink 1s steps(1) both}
+@keyframes bootBlink{0%{opacity:0}18%{opacity:1}32%{opacity:0}48%{opacity:1}62%{opacity:0}75%{opacity:1}}
+.led.soft{animation:breathe 3.2s ease-in-out 1.6s infinite}
+@keyframes breathe{0%,100%{box-shadow:0 0 10px 2px var(--led-glow)}50%{box-shadow:0 0 4px 1px var(--led-glow)}}
+
+/* INDEX button */
+.idxbtn{
+  background:none; border:0; padding:4px 2px; cursor:pointer;
+  font-family:var(--font-m); font-size:10.5px; letter-spacing:.14em; color:var(--silk);
+  text-transform:uppercase; position:relative;
+}
+.idxbtn::after{
+  content:""; position:absolute; left:0; right:100%; bottom:0; height:1px;
+  background:var(--led); transition:right .25s ease;
+}
+.idxbtn:hover::after{right:0}
+.idxbtn:focus-visible,.switch:focus-visible,.stop:focus-visible,.irow:focus-visible{outline:1px solid var(--led-ink); outline-offset:3px}
+
+/* finish switch */
+.switch{
+  position:relative; width:46px; height:22px; flex:none; border:0; border-radius:999px;
+  background:var(--chassis-deep);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.45), inset 0 -1px 0 var(--groove-l);
+  cursor:pointer; padding:0;
+}
+.switch .lever{
+  position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%;
+  background:linear-gradient(180deg,var(--silk),var(--silk-dim));
+  box-shadow:0 2px 4px rgba(0,0,0,.5);
+  transition:transform .38s cubic-bezier(.34,1.8,.5,1);
+}
+.switch[aria-checked="true"] .lever{transform:translateX(24px)}
+
+/* ---------- viewport + modules ---------- */
+.viewport{flex:1; min-width:0; position:relative; overflow:hidden; touch-action:none}
+.mtrack{position:absolute; inset:0; will-change:transform}
+.module{
+  position:absolute; left:0; right:0; height:100%; top:calc(var(--i)*100%);
+  display:flex; flex-direction:column; justify-content:center;
+  padding:0 2px; box-sizing:border-box;
+}
+.mwrap{display:flex; flex-direction:column; gap:clamp(14px,2.4vh,26px); min-width:0}
+
+.eyebrow{animation:fadeIn .5s ease .55s both}
+.name{
+  margin:0; font-weight:800; font-stretch:125%;
+  font-size:clamp(2.2rem,9vw,8rem); line-height:.96; letter-spacing:.005em;
+  text-transform:uppercase; color:var(--silk);
+}
+.name .line{display:block; white-space:nowrap}
+.name .ch{display:inline-block; animation:chIn .55s cubic-bezier(.2,.7,.2,1) both; animation-delay:calc(.4s + var(--i)*.035s)}
+@keyframes chIn{from{opacity:0; transform:translateY(.35em); filter:blur(7px)} to{opacity:1; transform:none; filter:blur(0)}}
+
+.rule{height:0; border-top:1px solid var(--groove-d); border-bottom:1px solid var(--groove-l); animation:fadeIn .6s ease 1.05s both}
+.subrow{display:flex; align-items:center; gap:14px; flex-wrap:wrap; animation:fadeIn .6s ease 1.15s both}
+.subrow .spacer{flex:1}
+.dot-sep{width:4px;height:4px;border-radius:50%;background:var(--silk-dim);flex:none}
+
+/* stub modules */
+.ghost{
+  margin:0; font-weight:800; font-stretch:125%;
+  font-size:clamp(2rem,8vw,7rem); line-height:1; letter-spacing:.005em; text-transform:uppercase;
+  color:transparent; -webkit-text-stroke:1px var(--stroke); paint-order:stroke;
+}
+@supports not (-webkit-text-stroke:1px black){ .ghost{color:var(--stroke)} }
+.module .arr{opacity:1}
+.module.arrive .mwrap{animation:arrive .6s cubic-bezier(.2,.7,.2,1) both}
+@keyframes arrive{from{opacity:.25; transform:translateY(14px)} to{opacity:1; transform:none}}
+
+/* scroll cue */
+.scrollcue{
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:8px; z-index:6;
+  animation:fadeIn .8s ease 1.6s both; transition:opacity .4s;
+}
+.scrollcue.gone{opacity:0; pointer-events:none}
+.scrollcue .chev{
+  width:8px; height:8px; border-right:1px solid var(--silk-dim); border-bottom:1px solid var(--silk-dim);
+  transform:rotate(45deg); animation:chev 1.6s ease-in-out infinite;
+}
+@keyframes chev{0%,100%{transform:translateY(-2px) rotate(45deg); opacity:.4}50%{transform:translateY(2px) rotate(45deg); opacity:1}}
+
+/* ---------- position gauge (right edge) ---------- */
+.posrail{
+  position:absolute; right:clamp(10px,1.6vw,22px); top:50%; transform:translateY(-50%);
+  z-index:6; animation:fadeIn .6s ease 1.1s both;
+}
+.posline{position:relative; width:32px; height:clamp(190px,38vh,300px)}
+.posline::before{
+  content:""; position:absolute; right:9px; top:0; bottom:0; width:1px;
+  background:var(--groove-l); box-shadow:-1px 0 0 var(--groove-d);
+}
+.gtick{position:absolute; right:9px; height:1px; background:var(--silk-dim); pointer-events:none}
+.gtick.minor{width:4px; opacity:.2}
+.gtick.station{width:9px; opacity:.55}
+.gnum{
+  position:absolute; right:24px; transform:translateY(-50%);
+  font-family:var(--font-m); font-size:8.5px; letter-spacing:.08em;
+  color:var(--silk-dim); opacity:.5; transition:color .25s,opacity .25s;
+  pointer-events:none; user-select:none;
+}
+.gnum.on{color:var(--led-ink); opacity:1}
+.stop{
+  position:absolute; right:0; width:32px; height:16px; margin-top:-8px;
+  background:none; border:0; padding:0; cursor:pointer;
+}
+.posfill{position:absolute; right:9px; top:0; width:1px; background:var(--led); opacity:.35; pointer-events:none}
+.posind{
+  position:absolute; right:5px; width:9px; height:2px; margin-top:-1px;
+  background:var(--led); box-shadow:0 0 8px 1px var(--led-glow); border-radius:1px;
+  pointer-events:none;
+}
+
+/* ---------- INDEX overlay ---------- */
+.index{
+  position:absolute; inset:0; z-index:8; background:var(--chassis);
+  padding:clamp(16px,2.6vw,36px); box-sizing:border-box;
+  display:flex; flex-direction:column;
+  opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s .3s;
+}
+.index.open{opacity:1; visibility:visible; transition:opacity .3s ease}
+.ixhead{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:clamp(14px,3vh,30px)}
+.ixrows{display:flex; flex-direction:column; justify-content:center; flex:1; min-height:0}
+.irow{
+  display:grid; grid-template-columns:3.5ch 1fr auto; align-items:baseline; gap:18px;
+  padding:clamp(10px,2.2vh,20px) 4px; background:none; border:0; text-align:left; cursor:pointer;
+  border-top:1px solid var(--groove-d); box-shadow:inset 0 1px 0 var(--groove-l);
+  opacity:0; transform:translateY(12px);
+  transition:opacity .4s ease, transform .4s cubic-bezier(.2,.7,.2,1);
+}
+.index.open .irow{opacity:1; transform:none}
+.irow:last-child{border-bottom:1px solid var(--groove-d)}
+.irow .inum{font-family:var(--font-m); font-size:11px; letter-spacing:.14em; color:var(--silk-dim)}
+.irow .iname{
+  font-family:var(--font-d); font-weight:800; font-stretch:125%; text-transform:uppercase;
+  font-size:clamp(1.3rem,3.6vw,2.4rem); line-height:1.05; color:var(--silk);
+  transition:color .2s, transform .25s cubic-bezier(.2,.7,.2,1);
+}
+.irow .ispec{font-family:var(--font-m); font-size:10px; letter-spacing:.12em; color:var(--silk-dim); text-transform:uppercase; white-space:nowrap}
+.irow:hover .iname{color:var(--led-ink); transform:translateX(10px)}
+.irow.here .inum{color:var(--led-ink)}
+@media (max-width:640px){ .irow .ispec{display:none} .irow{grid-template-columns:3.5ch 1fr} }
+
+/* vertical edge label */
+.edge-label{
+  position:absolute; left:10px; top:50%;
+  transform:translateY(-50%) rotate(180deg); writing-mode:vertical-rl;
+  font-family:var(--font-m); font-size:9.5px; letter-spacing:.3em;
+  color:var(--silk-dim); opacity:.5; user-select:none; z-index:6;
+  animation:fadeIn .8s ease 1.3s both;
+}
+
+/* status line + clock */
+.statusline{
+  overflow:hidden; max-width:0; white-space:nowrap;
+  animation:typeOn 1.1s steps(42) 1.45s both;
+}
+@keyframes typeOn{from{max-width:0}to{max-width:42ch}}
+.clock{font-variant-numeric:tabular-nums; display:inline-flex}
+.clock .d{display:inline-block}
+.clock .d.roll{animation:digitRoll .32s cubic-bezier(.2,.7,.2,1)}
+@keyframes digitRoll{from{transform:translateY(.55em); opacity:0} to{transform:none; opacity:1}}
+
+/* custom cursor */
+.cursor{
+  position:fixed; left:0; top:0; z-index:99; pointer-events:none;
+  width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%;
+  background:var(--led); box-shadow:0 0 10px 2px var(--led-glow);
+  opacity:0; transition:width .2s,height .2s,margin .2s,opacity .3s;
+}
+body.has-cursor .cursor{opacity:1}
+body.has-cursor, body.has-cursor button{cursor:none}
+.cursor.mag{width:14px; height:14px; margin:-7px 0 0 -7px}
+.cursor-label{
+  position:absolute; left:16px; top:-4px;
+  font-family:var(--font-m); font-size:9.5px; letter-spacing:.12em; color:var(--led-ink);
+  white-space:nowrap; opacity:0; transition:opacity .15s;
+}
+.cursor.mag .cursor-label{opacity:1}
+
+/* responsive */
+@media (max-width:720px){
+  .edge-label,.hide-s{display:none}
+  .micro{font-size:9.5px}
+  .posrail{right:8px}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important; transition:none !important}
+  .scanline,.sheen{display:none}
+  .statusline{max-width:none}
+  .index .irow{opacity:1; transform:none}
+}
+</style>
+
+<script>
+try{
+  var t=localStorage.getItem('instrument-finish');
+  if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}
+}catch(e){}
+</script>
+</head>
+<body>
+
+<div class="stage">
+  <div class="faceplate" id="faceplate">
+    <span class="tick tl">+</span><span class="tick tr">+</span>
+    <span class="tick bl">+</span><span class="tick br">+</span>
+    <div class="scanline"></div>
+    <div class="sheen" aria-hidden="true"></div>
+
+    <header class="rail top">
+      <div class="cluster">
+        <span class="led pwr soft" aria-hidden="true"></span>
+        <span class="micro">PWR</span>
+        <span class="divider-v" aria-hidden="true"></span>
+        <span class="micro strong">SM&#8209;01 · PERSONAL INSTRUMENT</span>
+        <span class="micro hide-s">REV D · PROTOTYPE</span>
+      </div>
+      <div class="cluster">
+        <button class="idxbtn" id="idxBtn" data-mag data-label="MODULE INDEX">INDEX</button>
+        <span class="divider-v" aria-hidden="true"></span>
+        <span class="micro">FINISH</span>
+        <button class="switch" id="finishSwitch" role="switch" aria-checked="false" data-mag data-label="FLIP FINISH">
+          <span class="lever"></span>
+        </button>
+        <span class="micro" id="finishLabel">GRAPHITE</span>
+      </div>
+    </header>
+
+    <div class="viewport" id="viewport">
+      <div class="mtrack" id="mtrack">
+
+        <section class="module" style="--i:0" id="m0">
+          <div class="mwrap">
+            <p class="eyebrow micro">UNIT DESIGNATION — <span class="amber">§00 COVER</span></p>
+            <h1 class="name" data-mag data-label="UNIT: S.MENGSHETTI">
+              <span class="line"><span class="ch" style="--i:0">S</span><span class="ch" style="--i:1">H</span><span class="ch" style="--i:2">R</span><span class="ch" style="--i:3">E</span><span class="ch" style="--i:4">E</span></span>
+              <span class="line"><span class="ch" style="--i:5">M</span><span class="ch" style="--i:6">E</span><span class="ch" style="--i:7">N</span><span class="ch" style="--i:8">G</span><span class="ch" style="--i:9">S</span><span class="ch" style="--i:10">H</span><span class="ch" style="--i:11">E</span><span class="ch" style="--i:12">T</span><span class="ch" style="--i:13">T</span><span class="ch" style="--i:14">I</span></span>
+            </h1>
+            <div class="rule" aria-hidden="true"></div>
+            <div class="subrow">
+              <span class="micro big strong">SOFTWARE ENGINEER</span>
+              <span class="dot-sep" aria-hidden="true"></span>
+              <span class="micro big">AI &amp; BACKEND SYSTEMS</span>
+              <span class="spacer"></span>
+              <span class="micro big amber">&#9679; STATUS: OPERATIONAL</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="module" style="--i:1" id="m1">
+          <div class="mwrap">
+            <p class="micro">§01 — <span class="amber">ABSTRACT</span></p>
+            <h2 class="ghost">ABSTRACT</h2>
+            <p class="micro">MODULE AWAITING ASSEMBLY — CONTENT PENDING</p>
+          </div>
+        </section>
+
+        <section class="module" style="--i:2" id="m2">
+          <div class="mwrap">
+            <p class="micro">§02 — <span class="amber">EXPERIENCE</span></p>
+            <h2 class="ghost">EXPERIENCE</h2>
+            <p class="micro">MODULE AWAITING ASSEMBLY — CONTENT PENDING</p>
+          </div>
+        </section>
+
+        <section class="module" style="--i:3" id="m3">
+          <div class="mwrap">
+            <p class="micro">§03 — <span class="amber">PROJECTS</span></p>
+            <h2 class="ghost">PROJECTS</h2>
+            <p class="micro">MODULE AWAITING ASSEMBLY — CONTENT PENDING</p>
+          </div>
+        </section>
+
+        <section class="module" style="--i:4" id="m4">
+          <div class="mwrap">
+            <p class="micro">§04 — <span class="amber">HONOURS</span></p>
+            <h2 class="ghost">HONOURS</h2>
+            <p class="micro">MODULE AWAITING ASSEMBLY — CONTENT PENDING</p>
+          </div>
+        </section>
+
+        <section class="module" style="--i:5" id="m5">
+          <div class="mwrap">
+            <p class="micro">§05 — <span class="amber">CONTACT</span></p>
+            <h2 class="ghost">CONTACT</h2>
+            <p class="micro">MODULE AWAITING ASSEMBLY — CONTENT PENDING</p>
+          </div>
+        </section>
+
+      </div>
+      <div class="scrollcue" id="scrollcue"><span class="micro">SCROLL</span><span class="chev" aria-hidden="true"></span></div>
+    </div>
+
+    <aside class="posrail" aria-label="Position">
+      <div class="posline" id="posline">
+        <div class="posfill" id="posfill"></div>
+        <div class="posind" id="posind"></div>
+      </div>
+    </aside>
+
+    <span class="edge-label">DESIGNED &amp; ASSEMBLED — PUNE, IN</span>
+
+    <footer class="rail bottom">
+      <span class="micro hide-s">SER. SM&#8209;2004&#8209;IN&#8209;PN</span>
+      <span class="micro statusline amber" id="statusLine">BOOT OK — MODULES 01–05 AWAITING ASSEMBLY</span>
+      <span class="micro strong">IST <span class="clock" id="clock"></span></span>
+    </footer>
+
+    <div class="index" id="index" aria-hidden="true">
+      <div class="ixhead">
+        <span class="micro strong">MODULE INDEX — SM&#8209;01</span>
+        <button class="idxbtn" id="idxClose" data-mag data-label="CLOSE">CLOSE ✕</button>
+      </div>
+      <nav class="ixrows" id="ixrows"></nav>
+    </div>
+
+  </div>
+</div>
+
+<div class="cursor" id="cursor"><span class="cursor-label" id="cursorLabel"></span></div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var finePointer=matchMedia('(hover:hover) and (pointer:fine)').matches;
+
+  /* ---- tiny mechanical click ---- */
+  function click(vol){
+    if(reduced) return;
+    try{
+      var ctx=window.__actx||(window.__actx=new (window.AudioContext||window.webkitAudioContext)());
+      if(ctx.state==='suspended') ctx.resume();
+      var o=ctx.createOscillator(), g=ctx.createGain(), t=ctx.currentTime;
+      o.type='square'; o.frequency.setValueAtTime(1900,t);
+      g.gain.setValueAtTime(vol||.05,t); g.gain.exponentialRampToValueAtTime(.0001,t+.04);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+.05);
+    }catch(e){}
+  }
+
+  /* ---- finish switch ---- */
+  var sw=document.getElementById('finishSwitch');
+  var swLabel=document.getElementById('finishLabel');
+  var mqlLight=matchMedia('(prefers-color-scheme: light)');
+  function effective(){
+    var a=root.getAttribute('data-theme');
+    if(a==='light'||a==='dark') return a;
+    return mqlLight.matches?'light':'dark';
+  }
+  function sync(){
+    var light=effective()==='light';
+    sw.setAttribute('aria-checked',String(light));
+    swLabel.textContent=light?'BONE':'GRAPHITE';
+  }
+  sw.addEventListener('click',function(){
+    var next=effective()==='light'?'dark':'light';
+    root.setAttribute('data-theme',next);
+    try{localStorage.setItem('instrument-finish',next);}catch(e){}
+    click(); sync();
+  });
+  mqlLight.addEventListener('change',sync);
+  sync();
+
+  /* ---- IST clock ---- */
+  var clock=document.getElementById('clock');
+  var fmt=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  var cells=[];
+  function buildClock(str){
+    clock.textContent=''; cells=[];
+    for(var i=0;i<str.length;i++){
+      var s=document.createElement('span');
+      s.className='d'; s.textContent=str[i];
+      clock.appendChild(s); cells.push(s);
+    }
+  }
+  function tickClock(){
+    var str=fmt.format(new Date());
+    if(cells.length!==str.length){buildClock(str); return;}
+    for(var i=0;i<str.length;i++){
+      if(cells[i].textContent!==str[i]){
+        cells[i].textContent=str[i];
+        if(!reduced){
+          cells[i].classList.remove('roll');
+          void cells[i].offsetWidth;
+          cells[i].classList.add('roll');
+        }
+      }
+    }
+  }
+  buildClock(fmt.format(new Date()));
+  setInterval(tickClock,250);
+
+  /* ================= SECTIONS ================= */
+  var NAMES=['COVER','ABSTRACT','EXPERIENCE','PROJECTS','HONOURS','CONTACT'];
+  var SPECS=[
+    'UNIT DESIGNATION & STATUS',
+    'THE ENGINEER, IN FOUR SENTENCES',
+    'VISA INC · DATASHERPA',
+    'CASE FILES — BUILT SYSTEMS',
+    'AWARDS & COMPETITION RECORD',
+    'CORRESPONDENCE & LINKS'
+  ];
+  var N=6, current=0;
+  var cur=0, vel=0, target=0;          /* float section position */
+  var mtrack=document.getElementById('mtrack');
+  var viewport=document.getElementById('viewport');
+  var statusLine=document.getElementById('statusLine');
+  var scrollcue=document.getElementById('scrollcue');
+  var posind=document.getElementById('posind');
+  var posfill=document.getElementById('posfill');
+  var BOOTMSG='BOOT OK — MODULES 01–05 AWAITING ASSEMBLY';
+  var modules=[];
+  for(var i=0;i<N;i++) modules.push(document.getElementById('m'+i));
+
+  /* position gauge: graduated scale + numbered stations */
+  var posline=document.getElementById('posline');
+  var gnums=[], gActive=0;
+  for(var s=0;s<N;s++){
+    var yp=s/(N-1)*100;
+    var tk=document.createElement('span');
+    tk.className='gtick station'; tk.style.top=yp+'%';
+    posline.appendChild(tk);
+    var nm=document.createElement('span');
+    nm.className='gnum'+(s===0?' on':''); nm.style.top=yp+'%';
+    nm.textContent='0'+s;
+    posline.appendChild(nm);
+    gnums.push(nm);
+    if(s<N-1){
+      for(var q=1;q<5;q++){
+        var mk=document.createElement('span');
+        mk.className='gtick minor';
+        mk.style.top=(yp+(q/5)*(100/(N-1)))+'%';
+        posline.appendChild(mk);
+      }
+    }
+    var b=document.createElement('button');
+    b.className='stop'; b.style.top=yp+'%';
+    b.setAttribute('aria-label','Go to section '+s);
+    (function(k){ b.addEventListener('click',function(){goTo(k);}); })(s);
+    posline.appendChild(b);
+  }
+
+  function arrive(i){
+    if(i===current) return;
+    current=i;
+    statusLine.textContent= i===0 ? BOOTMSG : 'MODULE 0'+i+' — STUB · CONTENT PENDING';
+    scrollcue.classList.toggle('gone', i!==0);
+    if(!reduced){
+      modules[i].classList.remove('arrive');
+      void modules[i].offsetWidth;
+      modules[i].classList.add('arrive');
+    }
+    click();
+  }
+  function goTo(i){
+    i=Math.max(0,Math.min(N-1,i));
+    if(i===target) return;
+    target=i;
+    if(reduced){cur=i; vel=0; render(); arrive(i);}
+  }
+
+  /* wheel: one detent per gesture */
+  var acc=0, cool=0;
+  addEventListener('wheel',function(e){
+    if(indexOpen) return;
+    var now=performance.now();
+    if(now<cool){acc=0; return;}
+    acc+=e.deltaY;
+    if(Math.abs(acc)>70){
+      goTo(target+(acc>0?1:-1));
+      acc=0; cool=now+380;
+    }
+  },{passive:true});
+
+  /* touch / drag */
+  var dragging=false, startY=0, startCur=0, lastY=0, lastT=0, dragVel=0;
+  viewport.addEventListener('pointerdown',function(e){
+    if(indexOpen) return;
+    dragging=true; startY=e.clientY; startCur=cur; lastY=e.clientY; lastT=performance.now(); dragVel=0;
+    viewport.setPointerCapture(e.pointerId);
+  });
+  viewport.addEventListener('pointermove',function(e){
+    if(!dragging) return;
+    var H=viewport.clientHeight||1;
+    var d=(startY-e.clientY)/H;
+    var p=startCur+d;
+    if(p<0) p*=.35; if(p>N-1) p=(N-1)+(p-(N-1))*.35;
+    cur=p;
+    var now=performance.now();
+    if(now-lastT>24){
+      dragVel=(lastY-e.clientY)/H/((now-lastT)/1000);
+      lastY=e.clientY; lastT=now;
+    }
+  });
+  viewport.addEventListener('pointerup',function(){
+    if(!dragging) return;
+    dragging=false;
+    var i=Math.round(cur+dragVel*.14);
+    target=Math.max(0,Math.min(N-1,i));
+  });
+  viewport.addEventListener('pointercancel',function(){dragging=false; target=Math.max(0,Math.min(N-1,Math.round(cur)));});
+
+  addEventListener('keydown',function(e){
+    if(e.key==='Escape'){closeIndex(); return;}
+    if(indexOpen) return;
+    if(e.key==='ArrowDown'||e.key==='PageDown'){goTo(target+1); e.preventDefault();}
+    else if(e.key==='ArrowUp'||e.key==='PageUp'){goTo(target-1); e.preventDefault();}
+    else if(e.key==='Home'){goTo(0);}
+    else if(e.key==='End'){goTo(N-1);}
+  });
+
+  function render(){
+    mtrack.style.transform='translateY('+(-cur*100)+'%)';
+    var pct=Math.max(0,Math.min(1,cur/(N-1)));
+    posind.style.top=(pct*100)+'%';
+    posfill.style.height=(pct*100)+'%';
+    var ni=Math.max(0,Math.min(N-1,Math.round(cur)));
+    if(ni!==gActive){
+      gnums[gActive].classList.remove('on');
+      gnums[ni].classList.add('on');
+      gActive=ni;
+    }
+  }
+  function sectionStep(dt){
+    if(dragging){render(); return;}
+    var d=target-cur;
+    if(Math.abs(d)<.0015&&Math.abs(vel)<.0015){
+      if(cur!==target){cur=target; render();}
+      if(current!==target) arrive(target);
+      return;
+    }
+    vel+=(d*62-vel*11.5)*dt;
+    cur+=vel*dt;
+    render();
+    if(Math.abs(d)<.06&&current!==target) arrive(target);
+  }
+
+  /* ================= INDEX overlay ================= */
+  var indexEl=document.getElementById('index');
+  var ixrows=document.getElementById('ixrows');
+  var indexOpen=false;
+  for(var r=0;r<N;r++){
+    var row=document.createElement('button');
+    row.className='irow';
+    row.style.transitionDelay=(r*45)+'ms';
+    row.innerHTML='<span class="inum">§0'+r+'</span><span class="iname">'+NAMES[r]+'</span><span class="ispec">'+SPECS[r]+'</span>';
+    (function(k){ row.addEventListener('click',function(){closeIndex(); goTo(k);}); })(r);
+    ixrows.appendChild(row);
+  }
+  var rowEls=Array.prototype.slice.call(ixrows.children);
+  function openIndex(){
+    indexOpen=true;
+    rowEls.forEach(function(rw,k){rw.classList.toggle('here',k===current);});
+    indexEl.classList.add('open');
+    indexEl.setAttribute('aria-hidden','false');
+    statusLine.textContent='INDEX OPEN — SELECT MODULE';
+    click();
+  }
+  function closeIndex(){
+    if(!indexOpen) return;
+    indexOpen=false;
+    indexEl.classList.remove('open');
+    indexEl.setAttribute('aria-hidden','true');
+    statusLine.textContent= current===0 ? BOOTMSG : 'MODULE 0'+current+' — STUB · CONTENT PENDING';
+    click(.03);
+  }
+  document.getElementById('idxBtn').addEventListener('click',openIndex);
+  document.getElementById('idxClose').addEventListener('click',closeIndex);
+
+  /* ---- tilt + sheen + cursor + loop ---- */
+  var face=document.getElementById('faceplate');
+  var doTilt=finePointer && !reduced;
+  var mx=innerWidth/2, my=innerHeight/2;
+  var rx=0, ry=0, trx=0, try_=0;
+
+  var curEl=document.getElementById('cursor');
+  var curLabel=document.getElementById('cursorLabel');
+  var doCursor=finePointer && !reduced;
+  var cx=innerWidth/2, cy=innerHeight/2, tx=cx, ty=cy, magEl=null, shown=false;
+
+  if(doTilt||doCursor){
+    addEventListener('mousemove',function(e){
+      mx=e.clientX; my=e.clientY; tx=e.clientX; ty=e.clientY;
+      if(doCursor&&!shown){shown=true; document.body.classList.add('has-cursor');}
+    });
+    document.addEventListener('mouseleave',function(){
+      trx=0; try_=0;
+      if(doCursor){document.body.classList.remove('has-cursor'); shown=false;}
+    });
+  }
+  if(doCursor){
+    document.querySelectorAll('[data-mag]').forEach(function(el){
+      el.addEventListener('mouseenter',function(){magEl=el; curLabel.textContent=el.getAttribute('data-label')||''; curEl.classList.add('mag');});
+      el.addEventListener('mouseleave',function(){if(magEl===el){magEl=null; curEl.classList.remove('mag');}});
+    });
+  }
+
+  var lastTm=performance.now();
+  function loop(now){
+    var dt=Math.min((now-lastTm)/1000,1/30); lastTm=now;
+    if(!document.hidden){
+      if(doTilt){
+        var nx=(mx/innerWidth-0.5)*2, ny=(my/innerHeight-0.5)*2;
+        try_=nx*2.2; trx=-ny*2.2;
+        rx+=(trx-rx)*.07; ry+=(try_-ry)*.07;
+        face.style.transform='rotateX('+rx.toFixed(3)+'deg) rotateY('+ry.toFixed(3)+'deg)';
+        var fr=face.getBoundingClientRect();
+        face.style.setProperty('--mx',((mx-fr.left)/fr.width*100).toFixed(1)+'%');
+        face.style.setProperty('--my',((my-fr.top)/fr.height*100).toFixed(1)+'%');
+      }
+      if(doCursor&&shown){
+        var gx=tx, gy=ty;
+        if(magEl && magEl.classList.contains('switch')){
+          var r2=magEl.getBoundingClientRect();
+          gx=(r2.left+r2.right)/2; gy=(r2.top+r2.bottom)/2;
+        }
+        cx+=(gx-cx)*.22; cy+=(gy-cy)*.22;
+        curEl.style.transform='translate('+cx+'px,'+cy+'px)';
+      }
+      sectionStep(dt);
+    }
+    requestAnimationFrame(loop);
+  }
+  render();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
